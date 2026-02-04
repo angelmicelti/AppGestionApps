@@ -2,7 +2,7 @@
   "name": "Gestión de Apps - @angelmicelti",
   "short_name": "Gestión Apps",
   "description": "Aplicación para gestión de aplicaciones educativas",
-  "start_url": "./AppGestionAppsFinal.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f9fafb",
   "theme_color": "#4f46e5",
