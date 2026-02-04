@@ -4,7 +4,7 @@ const APP_VERSION = '1.0.0';
 
 // Archivos a cachear
 const ARCHIVOS_CACHE = [
-  './AppGestionAppsFinal.html',
+  './index.html',
   'https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
@@ -64,7 +64,7 @@ self.addEventListener('activate', event => {
 // Evento 'fetch'
 self.addEventListener('fetch', event => {
   // Para el HTML principal, siempre intenta red primero (para obtener actualizaciones)
-  if (event.request.url.includes('AppGestionAppsFinal.html') || 
+  if (event.request.url.includes('index.html') || 
       event.request.mode === 'navigate') {
     console.log('[SW] Fetch para HTML, usando network-first');
     
