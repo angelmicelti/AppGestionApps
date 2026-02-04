@@ -6,7 +6,7 @@
     <title>Gestión de Apps - @angelmicelti</title>
     
     <!-- PWA: Manifest -->
-    <link rel="manifest" href="manifest-apps.json">
+    <link rel="manifest" href="manifest.json">
     
     <!-- PWA: Theme Color -->
     <meta name="theme-color" content="#4f46e5">
@@ -481,7 +481,7 @@
 
     <!-- PWA: Service Worker Registration -->
     <script>
-        // Control de versiones - DEBE COINCIDIR con sw-apps.js
+        // Control de versiones - DEBE COINCIDIR con sw.js
         const APP_VERSION = '1.0.0';
         let newServiceWorker = null;
         let registrationInstance = null;
@@ -530,7 +530,7 @@
         // ================================================
         if ('serviceWorker' in navigator) {
             // Registrar inmediatamente (no esperar a load)
-            navigator.serviceWorker.register('sw-apps.js?v=' + APP_VERSION)
+            navigator.serviceWorker.register('sw.js?v=' + APP_VERSION)
                 .then(function(registration) {
                     console.log('✅ Service Worker registrado. Scope:', registration.scope);
                     registrationInstance = registration;
