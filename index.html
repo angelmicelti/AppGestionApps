@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Apps - @angelmicelti</title>
+    
+    <!-- PWA: Manifest -->
+    <link rel="manifest" href="manifest-apps.json">
+    
+    <!-- PWA: Theme Color -->
+    <meta name="theme-color" content="#4f46e5">
+    
+    <!-- PWA: Apple Touch Icon (para iOS) -->
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gestión Apps">
+    
+    <!-- PWA: Iconos para diferentes dispositivos -->
+    <link rel="icon" type="image/png" href="icons/icon-72.png" sizes="72x72">
+    <link rel="icon" type="image/png" href="icons/icon-96.png" sizes="96x96">
+    <link rel="icon" type="image/png" href="icons/icon-128.png" sizes="128x128">
+    <link rel="icon" type="image/png" href="icons/icon-144.png" sizes="144x144">
+    <link rel="icon" type="image/png" href="icons/icon-152.png" sizes="152x152">
+    <link rel="icon" type="image/png" href="icons/icon-192.png" sizes="192x192">
+    <link rel="icon" type="image/png" href="icons/icon-384.png" sizes="384x384">
+    <link rel="icon" type="image/png" href="icons/icon-512.png" sizes="512x512">
+    
+    <!-- Tailwind CSS (Versión solicitada) -->
+    <script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Animaciones personalizadas */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 1.5s ease-out forwards;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* Ocultar scrollbar pero permitir scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Estilo para el indicador de guardado */
+        .saving-indicator {
+            transition: opacity 0.3s ease;
+            opacity: 0;
+        }
+        .saving-indicator.visible {
+            opacity: 1;
+        }
+
+        /* Estilos para la lista de gists (nuevos) */
+        .gist-item {
+            border-left: 4px solid transparent;
+            transition: all 0.2s;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .gist-item:hover {
+            background-color: #f8f9fa;
+            border-left-color: #4f46e5; /* Color indigo-600 */
+        }
+
+        .delete-gist-btn {
+            opacity: 0.5;
+            transition: all 0.2s;
+        }
+
+        .delete-gist-btn:hover {
+            opacity: 1;
+            color: #dc2626 !important; /* Color rojo-600 */
+        }
+
+        /* Estilo para indicador de eliminando */
+        .deleting {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Animación de spinner */
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Estilo para conflictos */
+        .conflict-day-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background-color: #fef3f2;
+        }
+
+        .conflict-day-item.resolved {
+            background-color: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+
+        /* Loader estilo PWA */
+        #app-loader {
+            position: fixed;
+            inset: 0;
+            background: white;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Tooltip */
+        #custom-tooltip {
+            position: fixed;
+            z-index: 10000;
+            background-color: rgba(17, 24, 39, 0.95);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            max-width: 250px;
+            white-space: pre-line;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans h-[100dvh] overflow-hidden selection:bg-blue-200">
+
+    <!-- Loader PWA -->
+    <div id="app-loader">
+        <div class="spinner mb-4"></div>
+        <h2 class="h5 text-secondary fw-bold">Cargando aplicación...</h2>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="custom-tooltip"></div>
+
+    <!-- =======================
+         PANTALLA 1: INTRO
+    ======================== -->
+    <div id="screen-intro" class="screen active flex-col items-center justify-between h-full w-full bg-gradient-to-br from-blue-600 to-indigo-800 text-white p-6 cursor-pointer select-none" onclick="navigateTo('screen-menu')">
+        <div class="flex-grow flex flex-col items-center justify-center animate-fade-in text-center pointer-events-none">
+            <div class="mb-6">
+                <i class="fa-solid fa-layer-group text-6xl opacity-90"></i>
+            </div>
+            <h1 class="text-4xl md:text-6xl font-bold tracking-wider mb-2">GESTIÓN DE APPS</h1>
+            <p class="text-xl md:text-2xl font-light opacity-80 tracking-widest">by @angelmicelti</p>
+        </div>
+        <div class="animate-pulse mb-8 text-sm md:text-base font-medium tracking-wide pointer-events-none">
+            Haz clic para ir a la aplicación <i class="fa-solid fa-arrow-right ml-2"></i>
+        </div>
+    </div>
+
+    <!-- =======================
+         PANTALLA 2: MENÚ PRINCIPAL
+    ======================== -->
+    <div id="screen-menu" class="screen flex-col h-full w-full max-w-4xl mx-auto bg-white shadow-xl md:my-4 md:rounded-xl overflow-hidden relative">
+        <!-- Header -->
+        <header class="bg-indigo-700 text-white p-4 shadow-md flex justify-between items-center">
+            <h2 class="text-xl font-bold"><i class="fa-solid fa-house mr-2"></i> Menú Principal</h2>
+            <div id="auth-status" class="badge bg-dark bg-opacity-50 font-monospace px-3 py-2 fw-normal">Modo Local</div>
+        </header>
+
+        <!-- Content -->
+        <main class="flex-grow flex flex-col items-center justify-center p-6 gap-6 overflow-y-auto w-full">
+            
+            <!-- Botones Principales -->
+            <button onclick="navigateTo('screen-search')" class="w-full max-w-md bg-white border-2 border-indigo-100 hover:border-indigo-500 hover:shadow-lg p-6 rounded-xl transition-all duration-300 group text-left">
+                <div class="flex items-center">
+                    <div class="bg-indigo-100 text-indigo-600 p-4 rounded-full mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-magnifying-glass text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800">Buscar Aplicaciones</h3>
+                        <p class="text-gray-500 text-sm mt-1">Consulta y filtra la base de datos.</p>
+                    </div>
+                </div>
+            </button>
+
+            <button onclick="openAddScreen()" class="w-full max-w-md bg-white border-2 border-green-100 hover:border-green-500 hover:shadow-lg p-6 rounded-xl transition-all duration-300 group text-left">
+                <div class="flex items-center">
+                    <div class="bg-green-100 text-green-600 p-4 rounded-full mr-4 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-plus text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800">Nueva Ficha</h3>
+                        <p class="text-gray-500 text-sm mt-1">Añade una nueva app al registro.</p>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Sección de Seguridad y Backups -->
+            <div class="w-full max-w-md mt-6 border-t pt-6">
+                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 text-center">Gestión de Copias de Seguridad</h4>
+                
+                <!-- Opción 1: Nube (GitHub Manager) -->
+                <button onclick="openGithubManager()" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-3 mb-4 shadow-lg">
+                    <i class="fa-brands fa-github text-xl"></i> 
+                    <span>Gestor de Backups (GitHub)</span>
+                </button>
+
+                <!-- Opción 2: Local (JSON) -->
+                <div class="flex gap-3">
+                    <button onclick="exportLocalJSON()" class="flex-1 bg-white hover:bg-blue-50 text-blue-700 font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 border border-blue-200 shadow-sm text-sm">
+                        <i class="fa-solid fa-file-export"></i> Exportar JSON
+                    </button>
+                    <label class="flex-1 bg-white hover:bg-green-50 text-green-700 font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 border border-green-200 shadow-sm text-sm cursor-pointer">
+                        <i class="fa-solid fa-file-import"></i> Importar JSON
+                        <input type="file" id="json-import-input" accept=".json" class="hidden" onchange="importLocalJSON(this)">
+                    </label>
+                </div>
+                <p class="text-xs text-gray-400 text-center mt-2">Exporta a local para guardar en Drive/USB</p>
+            </div>
+        </main>
+
+        <!-- Configuración GitHub (ahora en footer) -->
+        <div class="p-3 bg-gray-50 border-t border-gray-200">
+            <button onclick="toggleConfigModal()" class="w-full text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-gear"></i> Configurar Token GitHub
+            </button>
+        </div>
+    </div>
+
+    <!-- =======================
+         PANTALLA 3: AÑADIR/EDITAR APP
+    ======================== -->
+    <div id="screen-add" class="screen flex-col h-full w-full max-w-4xl mx-auto bg-white shadow-xl md:my-4 md:rounded-xl overflow-hidden">
+        <header class="bg-green-600 text-white p-4 shadow-md flex justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <button onclick="navigateTo('screen-menu')" class="hover:bg-green-700 p-2 rounded-full transition"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 id="form-title" class="text-xl font-bold">Añadir Nueva Aplicación</h2>
+            </div>
+            <!-- Indicador de Autoguardado -->
+            <div id="autosave-indicator" class="saving-indicator text-xs font-semibold bg-green-700 px-2 py-1 rounded bg-opacity-50 hidden md:block">
+                <i class="fa-solid fa-check"></i> Guardado
+            </div>
+        </header>
+
+        <main class="flex-grow p-6 overflow-y-auto">
+            <form id="add-app-form" class="max-w-lg mx-auto space-y-6">
+                
+                <!-- Título -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Título de la Aplicación</label>
+                    <input type="text" id="app-title" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition" placeholder="Ej: Gestión de Notas v2">
+                </div>
+
+                <!-- Descripción -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                    <textarea id="app-description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition resize-none" placeholder="Breve resumen de las funciones..."></textarea>
+                </div>
+
+                <!-- Temática -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Temática</label>
+                    <select id="app-category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none bg-white transition">
+                        <!-- Se llena con JS -->
+                    </select>
+                </div>
+
+                <!-- Enlace Drive -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Enlace Google Drive</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2.5 text-gray-400"><i class="fa-brands fa-google-drive"></i></span>
+                        <input type="url" id="app-drive" required class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition" placeholder="https://drive.google.com/...">
+                    </div>
+                </div>
+                
+                <!-- TOKEN ESPECÍFICO DE LA APP -->
+                <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <label class="block text-sm font-medium text-indigo-800 mb-1">Token de GitHub de la App (Opcional)</label>
+                    <p class="text-xs text-indigo-600 mb-2">Token específico necesario para que esta app guarde datos.</p>
+                    
+                    <input type="password" id="app-github-token" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition mb-2" placeholder="ghp_xxxxxxxxxxxx">
+                    
+                    <div class="flex items-center">
+                        <label for="app-token-file" class="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center bg-white border border-indigo-200 px-3 py-1.5 rounded shadow-sm">
+                            <i class="fa-solid fa-file-import mr-2"></i> Importar Token (.txt)
+                        </label>
+                        <input type="file" id="app-token-file" accept=".txt" class="hidden" onchange="importAppTokenFromFile(this)">
+                        <span id="app-token-file-name" class="text-xs text-gray-500 ml-2 truncate max-w-[150px]"></span>
+                    </div>
+                </div>
+
+                <!-- Check PWA -->
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center mb-2">
+                        <input type="checkbox" id="app-is-pwa" class="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500" onchange="togglePwaUrlInput()">
+                        <label for="app-is-pwa" class="ml-2 text-sm font-medium text-gray-700">Es una Progressive Web App (PWA)</label>
+                    </div>
+                    
+                    <div id="pwa-url-container" class="hidden mt-3 animate-fade-in">
+                        <label class="block text-xs font-medium text-gray-500 mb-1">URL de Alojamiento</label>
+                        <input type="url" id="app-pwa-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition text-sm" placeholder="https://mi-app.netlify.app">
+                    </div>
+                </div>
+
+                <!-- Botón Guardar -->
+                <button type="submit" id="form-submit-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-lg transition transform active:scale-95">
+                    <i class="fa-solid fa-save mr-2"></i> Guardar Ficha
+                </button>
+            </form>
+        </main>
+    </div>
+
+    <!-- =======================
+         PANTALLA 4: BUSCAR APPS
+    ======================== -->
+    <div id="screen-search" class="screen flex-col h-full w-full max-w-4xl mx-auto bg-white shadow-xl md:my-4 md:rounded-xl overflow-hidden">
+        <header class="bg-indigo-600 text-white p-4 shadow-md flex items-center gap-3">
+            <button onclick="navigateTo('screen-menu')" class="hover:bg-indigo-700 p-2 rounded-full transition"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2 class="text-xl font-bold">Buscar Aplicaciones</h2>
+        </header>
+
+        <div class="p-4 bg-gray-50 border-b border-gray-200">
+            <!-- Filtros -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+                <input type="text" id="search-keyword" placeholder="Buscar por título..." class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" oninput="filterApps()">
+                
+                <select id="search-category" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white" onchange="filterApps()">
+                    <option value="">Todas las temáticas</option>
+                    <!-- JS rellena esto -->
+                </select>
+
+                <label class="flex items-center justify-center px-4 py-2 border rounded-lg bg-white cursor-pointer hover:bg-gray-100 transition">
+                    <input type="checkbox" id="search-pwa-only" class="w-4 h-4 text-indigo-600 mr-2" onchange="filterApps()">
+                    <span class="text-sm font-medium text-gray-600">Solo PWA</span>
+                </label>
+            </div>
+            <div class="text-center mt-2 text-xs text-gray-500" id="results-count">Mostrando 0 resultados</div>
+        </div>
+
+        <main class="flex-grow p-4 bg-gray-100 overflow-y-auto no-scrollbar">
+            <div id="apps-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+                <!-- Aquí se inyectan las tarjetas -->
+            </div>
+            
+            <!-- Estado vacío -->
+            <div id="empty-state" class="hidden flex-col items-center justify-center mt-10 text-gray-400">
+                <i class="fa-solid fa-box-open text-5xl mb-4"></i>
+                <p>No se encontraron aplicaciones.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- =======================
+         PANTALLA 5: GESTOR GITHUB (MEJORADO)
+    ======================== -->
+    <div id="screen-github" class="screen flex-col h-full w-full max-w-4xl mx-auto bg-white shadow-xl md:my-4 md:rounded-xl overflow-hidden relative">
+        <header class="bg-gray-800 text-white p-4 shadow-md flex items-center gap-3">
+            <button onclick="navigateTo('screen-menu')" class="hover:bg-gray-700 p-2 rounded-full transition"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2 class="text-xl font-bold"><i class="fa-brands fa-github mr-2"></i> Gestor de Backups</h2>
+        </header>
+
+        <div class="bg-gray-100 p-4 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <p class="text-sm text-gray-600 mb-1">Aquí puedes ver y administrar las copias guardadas en tu cuenta de GitHub.</p>
+                <p class="text-xs text-gray-500">Archivo: <code class="bg-gray-200 px-1 rounded">apps_backup.json</code></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="listGists(true)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded shadow transition flex items-center">
+                    <i class="fa-solid fa-rotate mr-1"></i> Actualizar
+                </button>
+                <button onclick="createFreshGist()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-3 rounded shadow transition flex items-center">
+                    <i class="fa-solid fa-plus mr-1"></i> Nueva Copia
+                </button>
+            </div>
+        </div>
+
+        <main class="flex-grow p-4 bg-gray-50 overflow-y-auto">
+            <div id="gist-loading" class="hidden flex-col items-center justify-center py-10 text-gray-500">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-3 text-indigo-500"></i>
+                <p>Conectando con GitHub...</p>
+            </div>
+            
+            <div id="gist-list-container" class="space-y-3">
+                <!-- Se rellena con JS -->
+            </div>
+            
+            <div id="gist-empty" class="hidden flex-col items-center justify-center py-10 text-gray-400">
+                <i class="fa-brands fa-github-alt text-5xl mb-3"></i>
+                <p>No se encontraron backups de esta app.</p>
+                <p class="text-xs mt-2">Usa el botón "Nueva Copia" para crear tu primer backup</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- =======================
+         MODAL CONFIGURACIÓN GLOBAL
+    ======================== -->
+    <div id="config-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Configuración GitHub Gist</h3>
+            <p class="text-sm text-gray-500 mb-4">Para gestionar copias, necesitas un Personal Access Token (PAT) de GitHub.</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-600 uppercase">GitHub Token</label>
+                    <input type="password" id="conf-token" class="w-full border rounded p-2 text-sm mt-1" placeholder="ghp_xxxxxxxxxxxx">
+                    
+                    <div class="mt-2 flex items-center bg-gray-50 p-2 rounded border border-gray-200">
+                        <label for="token-file" class="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center">
+                            <i class="fa-solid fa-file-import mr-2"></i> Cargar Token desde archivo (.txt)
+                        </label>
+                        <input type="file" id="token-file" accept=".txt" class="hidden" onchange="importTokenFromFile(this)">
+                        <span id="file-name-display" class="text-xs text-gray-400 ml-2 truncate max-w-[150px]"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="toggleConfigModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
+                <button onclick="saveConfig()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Guardar Config</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PARA ELIMINAR GIST (NUEVO) -->
+    <div id="modal-delete-confirm" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Confirmar Eliminación</h3>
+            <p class="text-sm text-gray-600 mb-4" id="delete-confirm-message"></p>
+            
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
+                <button onclick="confirmDeleteGist()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" id="confirm-delete-btn">
+                    <i class="fa-solid fa-trash mr-2"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-xl opacity-0 transition-opacity duration-300 pointer-events-none z-50">
+        Mensaje
+    </div>
+
+    <!-- NOTIFICATION AREA (similar a index.html) -->
+    <div id="notification-area" class="position-fixed bottom-0 end-0 p-4 z-3 hidden">
+        <div id="notification-msg" class="alert shadow-lg fw-bold text-white mb-0"></div>
+    </div>
+
+    <!-- PWA: Service Worker Registration -->
+    <script>
+        // Control de versiones - DEBE COINCIDIR con sw-apps.js
+        const APP_VERSION = '1.0.0';
+        let newServiceWorker = null;
+        let registrationInstance = null;
+        let isUpdating = false;
+
+        // ================================================
+        // VERIFICACIÓN DE VERSIÓN AL CARGAR
+        // ================================================
+        (function checkVersionOnLoad() {
+            const savedVersion = localStorage.getItem('app_version');
+            console.log('📱 Versión guardada:', savedVersion, '| Nueva:', APP_VERSION);
+            
+            if (savedVersion !== APP_VERSION) {
+                console.log('🔄 Cambio de versión detectado');
+                
+                // Marcar que estamos en proceso de actualización
+                sessionStorage.setItem('updating_to', APP_VERSION);
+                
+                // Limpiar cachés de Service Worker
+                if ('caches' in window) {
+                    caches.keys().then(cacheNames => {
+                        cacheNames.forEach(cacheName => {
+                            if (cacheName !== 'gestion-apps-v' + APP_VERSION.replace(/\./g, '-')) {
+                                console.log('🗑️ Eliminando caché antigua:', cacheName);
+                                caches.delete(cacheName);
+                            }
+                        });
+                    });
+                }
+                
+                // Guardar nueva versión
+                localStorage.setItem('app_version', APP_VERSION);
+                
+                // Si estamos actualizando desde una versión anterior, recargar
+                if (savedVersion && savedVersion !== APP_VERSION) {
+                    console.log('🔄 Recargando para aplicar actualización...');
+                    setTimeout(() => {
+                        window.location.reload(true);
+                    }, 1000);
+                }
+            }
+        })();
+
+        // ================================================
+        // REGISTRO DEL SERVICE WORKER
+        // ================================================
+        if ('serviceWorker' in navigator) {
+            // Registrar inmediatamente (no esperar a load)
+            navigator.serviceWorker.register('sw-apps.js?v=' + APP_VERSION)
+                .then(function(registration) {
+                    console.log('✅ Service Worker registrado. Scope:', registration.scope);
+                    registrationInstance = registration;
+                    
+                    // Configurar comprobación periódica de actualizaciones
+                    setInterval(() => {
+                        if (!isUpdating) {
+                            registration.update();
+                        }
+                    }, 2 * 60 * 1000); // Cada 2 minutos
+                    
+                    // Escuchar actualizaciones del Service Worker
+                    registration.addEventListener('updatefound', () => {
+                        newServiceWorker = registration.installing;
+                        console.log('🔄 Nuevo Service Worker encontrado. Estado:', newServiceWorker.state);
+                        
+                        newServiceWorker.addEventListener('statechange', () => {
+                            console.log('📊 Estado del nuevo SW:', newServiceWorker.state);
+                            
+                            if (newServiceWorker.state === 'installed') {
+                                if (navigator.serviceWorker.controller) {
+                                    // Hay una nueva versión disponible
+                                    console.log('🎉 Nueva versión del Service Worker lista');
+                                    showUpdateNotification();
+                                }
+                            }
+                        });
+                    });
+                    
+                    // Verificar actualizaciones inmediatamente
+                    registration.update();
+                })
+                .catch(function(error) {
+                    console.error('❌ Error registrando Service Worker:', error);
+                });
+            
+            // ================================================
+            // COMUNICACIÓN CON EL SERVICE WORKER
+            // ================================================
+            
+            // Escuchar mensajes del Service Worker
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data && event.data.type === 'SW_UPDATED') {
+                    console.log('🔄 Service Worker actualizado a versión:', event.data.version);
+                    showReloadNotification();
+                }
+                
+                if (event.data && event.data.type === 'CACHE_UPDATED') {
+                    console.log('🔄 Cache actualizado para:', event.data.url);
+                }
+            });
+            
+            // Escuchar cambios de visibilidad (cuando la app vuelve a primer plano)
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && registrationInstance && !isUpdating) {
+                    console.log('🔍 App visible, verificando actualizaciones...');
+                    registrationInstance.update();
+                }
+            });
+            
+            // Forzar actualización al conectar/desconectar red
+            window.addEventListener('online', () => {
+                if (registrationInstance && !isUpdating) {
+                    console.log('📶 Conectado a internet, verificando actualizaciones...');
+                    registrationInstance.update();
+                }
+            });
+        }
+
+        // ================================================
+        // FUNCIONES DE NOTIFICACIÓN
+        // ================================================
+        
+        function showUpdateNotification() {
+            // Solo mostrar si no estamos ya en proceso de actualización
+            if (isUpdating) return;
+            
+            // Crear notificación flotante
+            const notification = document.createElement('div');
+            notification.id = 'pwa-update-notification';
+            notification.innerHTML = `
+                <div class="alert alert-warning alert-dismissible fade show shadow-lg" role="alert" 
+                     style="position: fixed; bottom: 20px; right: 20px; left: 20px; z-index: 9999; max-width: 400px; margin: 0 auto; font-family: system-ui, sans-serif;">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-refresh fa-spin me-2" style="width: 20px; height: 20px;"></i>
+                        <strong class="me-auto">Actualización disponible</strong>
+                    </div>
+                    <p class="mb-1 mt-2 small">Hay una nueva versión de la aplicación.</p>
+                    <div class="d-flex gap-2 mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="updateAppNow()">
+                            Actualizar ahora
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="dismissUpdate()">
+                            Más tarde
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-ocultar después de 30 segundos
+            setTimeout(() => {
+                if (notification.parentNode && !isUpdating) {
+                    notification.remove();
+                }
+            }, 30000);
+        }
+        
+        function showReloadNotification() {
+            const notification = document.createElement('div');
+            notification.id = 'pwa-reload-notification';
+            notification.innerHTML = `
+                <div class="alert alert-info alert-dismissible fade show shadow-lg" role="alert" 
+                     style="position: fixed; top: 80px; right: 20px; z-index: 9999; max-width: 350px; font-family: system-ui, sans-serif;">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-check-circle me-2 text-success" style="width: 20px; height: 20px;"></i>
+                        <strong class="me-auto">Actualización lista</strong>
+                        <button type="button" class="btn-close btn-sm" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
+                    </div>
+                    <p class="mb-0 mt-1 small">La aplicación se ha actualizado. <a href="javascript:location.reload()" class="alert-link">Recargar</a> para aplicar cambios.</p>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+        }
+
+        // ================================================
+        // FUNCIONES GLOBALES PARA ACTUALIZACIÓN
+        // ================================================
+        
+        window.updateAppNow = function() {
+            isUpdating = true;
+            
+            if (newServiceWorker) {
+                console.log('🚀 Activando nuevo Service Worker...');
+                newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+            
+            // Mostrar loader
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.display = 'flex';
+                loader.style.opacity = '1';
+                loader.innerHTML = `
+                    <div class="spinner mb-4"></div>
+                    <h2 class="h5 text-secondary fw-bold">Actualizando aplicación...</h2>
+                    <p class="small text-muted mt-2">Esto tomará unos segundos</p>
+                `;
+            }
+            
+            // Recargar después de 1 segundo para dar tiempo al SW
+            setTimeout(() => {
+                console.log('🔄 Recargando aplicación...');
+                window.location.reload(true);
+            }, 1000);
+        };
+        
+        window.dismissUpdate = function() {
+            const notification = document.getElementById('pwa-update-notification');
+            if (notification) {
+                notification.remove();
+            }
+        };
+
+        // ================================================
+        // EVENTOS DE INSTALACIÓN PWA
+        // ================================================
+        
+        window.addEventListener('beforeinstallprompt', (event) => {
+            console.log('📲 PWA: beforeinstallprompt disparado');
+            window.deferredPrompt = event;
+            
+            // Opcional: Mostrar botón de instalación
+            // showInstallButton();
+        });
+
+        window.addEventListener('appinstalled', (event) => {
+            console.log('✅ PWA instalada correctamente');
+            window.deferredPrompt = null;
+            
+            // Limpiar caché para empezar fresco
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => caches.delete(name));
+                });
+            }
+        });
+
+        // ================================================
+        // DETECCIÓN DE MODO OFFLINE/ONLINE
+        // ================================================
+        
+        window.addEventListener('offline', () => {
+            console.log('🔴 Modo offline');
+            // Podrías mostrar un indicador de offline
+        });
+        
+        window.addEventListener('online', () => {
+            console.log('🟢 Modo online');
+            // Intentar sincronizar si hay datos pendientes
+        });
+        
+        // ================================================
+        // VERIFICACIÓN AL VOLVER A LA APP (PAGESHOW)
+        // ================================================
+        
+        window.addEventListener('pageshow', (event) => {
+            // Si la página viene de cache (back/forward), forzar actualización
+            if (event.persisted && registrationInstance && !isUpdating) {
+                console.log('🔍 Página cargada desde cache, verificando actualizaciones...');
+                registrationInstance.update();
+                
+                // Verificar si hay una actualización pendiente
+                const pendingUpdate = sessionStorage.getItem('update_pending');
+                if (pendingUpdate === 'true') {
+                    sessionStorage.removeItem('update_pending');
+                    window.location.reload(true);
+                }
+            }
+        });
+        
+        // ================================================
+        // FORZAR ACTUALIZACIÓN MANUAL (para debugging)
+        // ================================================
+        
+        window.forceUpdate = function() {
+            if (registrationInstance) {
+                console.log('🔄 Forzando actualización manual...');
+                registrationInstance.update().then(() => {
+                    if (newServiceWorker) {
+                        newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+                        setTimeout(() => window.location.reload(true), 500);
+                    }
+                });
+            }
+        };
+
+        // Ocultar loader después de cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('app-loader');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.remove(), 500);
+                }
+            }, 1000);
+        });
+    </script>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- DATA & CONSTANTS ---
+        const CATEGORIES = [
+            "Equipo directivo", 
+            "Física", 
+            "Gestión departamento", 
+            "Matemáticas",
+            "Química", 
+            "Tecnología"
+        ].sort(); 
+
+        const GIST_FILENAME = 'apps_backup.json';
+        const GIST_DESC = 'Gestión de Apps - Backup';
+
+        let appsDB = JSON.parse(localStorage.getItem('appsDB')) || [];
+        let ghConfig = JSON.parse(localStorage.getItem('ghConfig')) || { token: '' };
+        let editingAppId = null; 
+        let autoSaveTimeout; 
+        let currentGists = [];
+        let gistToDelete = null;
+
+        // --- DOM ELEMENTS ---
+        const categorySelects = [document.getElementById('app-category'), document.getElementById('search-category')];
+        const appsListContainer = document.getElementById('apps-list');
+        const emptyState = document.getElementById('empty-state');
+        const countLabel = document.getElementById('results-count');
+
+        // --- UTILITY FUNCTIONS ---
+        function showNotification(msg, type = 'success') {
+            const area = document.getElementById('notification-area');
+            const box = document.getElementById('notification-msg');
+            box.textContent = msg;
+            box.className = 'alert shadow-lg fw-bold text-white mb-0'; 
+            if(type === 'error') {
+                box.classList.add('bg-red-600');
+            } else if(type === 'info') {
+                box.classList.add('bg-blue-600');
+            } else {
+                box.classList.add('bg-green-600');
+            }
+            area.classList.remove('hidden'); 
+            setTimeout(() => area.classList.add('hidden'), 3000);
+        }
+
+        function showToast(message, type = "success") {
+            const toast = document.getElementById('toast');
+            
+            // Configurar color según tipo
+            if (type === "error") {
+                toast.style.backgroundColor = "#dc2626"; // rojo-600
+            } else if (type === "info") {
+                toast.style.backgroundColor = "#2563eb"; // azul-600
+            } else {
+                toast.style.backgroundColor = "#16a34a"; // verde-600
+            }
+            
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            
+            setTimeout(() => { 
+                toast.style.opacity = '0'; 
+            }, 3000);
+        }
+
+        function updateAuthStatus(isConnected, userLogin) {
+            const el = document.getElementById('auth-status');
+            if(isConnected) {
+                el.innerText = `Conectado (${userLogin})`; 
+                el.classList.remove('bg-dark');
+                el.classList.add('bg-green-600');
+            } else {
+                el.innerText = 'Modo Local'; 
+                el.classList.remove('bg-green-600');
+                el.classList.add('bg-dark');
+            }
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            const introScreen = document.getElementById('screen-intro');
+            
+            introScreen.addEventListener('touchstart', (e) => {
+                if (e.cancelable) e.preventDefault(); 
+                navigateTo('screen-menu');
+            }, { passive: false });
+
+            categorySelects.forEach(select => {
+                if(select.id === 'search-category') return; 
+                CATEGORIES.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    select.appendChild(option);
+                });
+            });
+
+            const searchSelect = document.getElementById('search-category');
+            CATEGORIES.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                searchSelect.appendChild(option);
+            });
+
+            document.getElementById('conf-token').value = ghConfig.token;
+
+            // Verificar token al cargar
+            if (ghConfig.token) {
+                verifyGitHubToken();
+            }
+
+            setupAutoSave();
+            filterApps(); 
+        };
+
+        // --- NAVIGATION ---
+        function navigateTo(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            if(screenId === 'screen-search') {
+                filterApps(); 
+            }
+        }
+
+        // --- AUTOSAVE LOGIC ---
+        function setupAutoSave() {
+            const formInputs = document.querySelectorAll('#add-app-form input, #add-app-form textarea, #add-app-form select');
+            formInputs.forEach(input => {
+                input.addEventListener('input', handleAutoSave);
+                input.addEventListener('change', handleAutoSave);
+            });
+        }
+
+        function handleAutoSave() {
+            if (!editingAppId) return;
+            clearTimeout(autoSaveTimeout);
+            showSavingIndicator(true, "Guardando...");
+            autoSaveTimeout = setTimeout(() => { performAutoSave(); }, 500);
+        }
+
+        function performAutoSave() {
+            const index = appsDB.findIndex(a => a.id === editingAppId);
+            if (index === -1) return;
+
+            const formData = {
+                title: document.getElementById('app-title').value,
+                description: document.getElementById('app-description').value,
+                category: document.getElementById('app-category').value,
+                driveLink: document.getElementById('app-drive').value,
+                isPWA: document.getElementById('app-is-pwa').checked,
+                pwaUrl: document.getElementById('app-pwa-url').value,
+                githubToken: document.getElementById('app-github-token').value
+            };
+
+            appsDB[index] = { ...appsDB[index], ...formData };
+            saveLocal();
+            
+            showSavingIndicator(true, "Guardado");
+            setTimeout(() => { showSavingIndicator(false); }, 1500);
+        }
+
+        function showSavingIndicator(show, text = "") {
+            const indicator = document.getElementById('autosave-indicator');
+            if(show) {
+                indicator.innerHTML = `<i class="fa-solid fa-${text === 'Guardando...' ? 'spinner fa-spin' : 'check'}"></i> ${text}`;
+                indicator.classList.remove('opacity-0');
+                indicator.classList.add('visible');
+            } else {
+                indicator.classList.remove('visible');
+                indicator.classList.add('opacity-0');
+            }
+        }
+
+        // --- APP CRUD LOGIC ---
+        function togglePwaUrlInput() {
+            const isChecked = document.getElementById('app-is-pwa').checked;
+            const container = document.getElementById('pwa-url-container');
+            const input = document.getElementById('app-pwa-url');
+            
+            if (isChecked) {
+                container.classList.remove('hidden');
+                input.setAttribute('required', 'true');
+            } else {
+                container.classList.add('hidden');
+                input.removeAttribute('required');
+            }
+        }
+
+        function openAddScreen() {
+            editingAppId = null;
+            document.getElementById('add-app-form').reset();
+            document.getElementById('app-token-file-name').textContent = '';
+            
+            document.getElementById('form-title').textContent = 'Añadir Nueva Aplicación';
+            document.getElementById('form-submit-btn').innerHTML = '<i class="fa-solid fa-save mr-2"></i> Guardar Ficha';
+            showSavingIndicator(false);
+            togglePwaUrlInput();
+            navigateTo('screen-add');
+        }
+
+        function openEditScreen(id) {
+            const app = appsDB.find(a => a.id === id);
+            if(!app) return;
+
+            editingAppId = id;
+            document.getElementById('app-title').value = app.title;
+            document.getElementById('app-description').value = app.description || '';
+            document.getElementById('app-category').value = app.category;
+            document.getElementById('app-drive').value = app.driveLink;
+            document.getElementById('app-is-pwa').checked = app.isPWA;
+            document.getElementById('app-pwa-url').value = app.pwaUrl || '';
+            document.getElementById('app-github-token').value = app.githubToken || '';
+            document.getElementById('app-token-file-name').textContent = '';
+
+            document.getElementById('form-title').textContent = 'Editar Aplicación';
+            document.getElementById('form-submit-btn').innerHTML = '<i class="fa-solid fa-rotate mr-2"></i> Actualizar Ficha';
+            showSavingIndicator(false);
+            
+            togglePwaUrlInput();
+            navigateTo('screen-add');
+        }
+        
+        function importAppTokenFromFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('app-token-file-name').textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result.trim();
+                if (text) {
+                    document.getElementById('app-github-token').value = text;
+                    showToast('Token de App cargado');
+                    if(editingAppId) handleAutoSave();
+                } else { alert("El archivo está vacío"); }
+            };
+            reader.readAsText(file);
+        }
+
+        document.getElementById('add-app-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = {
+                title: document.getElementById('app-title').value,
+                description: document.getElementById('app-description').value,
+                category: document.getElementById('app-category').value,
+                driveLink: document.getElementById('app-drive').value,
+                isPWA: document.getElementById('app-is-pwa').checked,
+                pwaUrl: document.getElementById('app-pwa-url').value,
+                githubToken: document.getElementById('app-github-token').value
+            };
+
+            if (editingAppId) {
+                const index = appsDB.findIndex(a => a.id === editingAppId);
+                if (index !== -1) {
+                    appsDB[index] = { ...appsDB[index], ...formData };
+                    showNotification('Aplicación actualizada');
+                }
+            } else {
+                const newApp = { id: Date.now(), ...formData };
+                appsDB.push(newApp);
+                showNotification('Aplicación guardada');
+            }
+            saveLocal();
+            e.target.reset();
+            editingAppId = null;
+            navigateTo('screen-menu');
+        });
+
+        // --- SEARCH LOGIC ---
+        function filterApps() {
+            const keyword = document.getElementById('search-keyword').value.toLowerCase();
+            const category = document.getElementById('search-category').value;
+            const pwaOnly = document.getElementById('search-pwa-only').checked;
+
+            const filtered = appsDB.filter(app => {
+                const matchTitle = app.title.toLowerCase().includes(keyword);
+                const matchCat = category === '' || app.category === category;
+                const matchPwa = !pwaOnly || app.isPWA;
+                return matchTitle && matchCat && matchPwa;
+            });
+            renderResults(filtered);
+        }
+
+        function renderResults(apps) {
+            appsListContainer.innerHTML = '';
+            countLabel.textContent = `Mostrando ${apps.length} resultados`;
+
+            if (apps.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden');
+                emptyState.classList.remove('flex');
+
+                apps.forEach(app => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition relative group';
+                    
+                    let icon = 'fa-folder';
+                    if(app.category.includes('Tecnología')) icon = 'fa-microchip';
+                    if(app.category.includes('Química')) icon = 'fa-flask';
+                    if(app.category.includes('Física')) icon = 'fa-atom';
+                    if(app.category.includes('Matemáticas')) icon = 'fa-calculator'; 
+                    if(app.category.includes('Directivo')) icon = 'fa-users-gear';
+
+                    const tokenBadge = app.githubToken ? `<span class="ml-2 text-indigo-500" title="Token GitHub configurado"><i class="fa-solid fa-key"></i></span>` : '';
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="bg-indigo-50 text-indigo-700 text-xs font-bold px-2 py-1 rounded uppercase tracking-wide">
+                                <i class="fa-solid ${icon} mr-1"></i> ${app.category}
+                            </span>
+                            <div class="flex gap-2">
+                                <button onclick="openEditScreen(${app.id})" class="text-gray-300 hover:text-blue-500 transition px-1" title="Editar">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="deleteApp(${app.id})" class="text-gray-300 hover:text-red-500 transition px-1" title="Eliminar">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800 mb-1 flex items-center">${app.title} ${tokenBadge}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2 h-10">${app.description || 'Sin descripción disponible.'}</p>
+                        <div class="flex flex-col gap-2 mt-auto">
+                            <a href="${app.driveLink}" target="_blank" class="flex items-center justify-center w-full py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-sm font-medium">
+                                <i class="fa-brands fa-google-drive mr-2"></i> Ver en Drive
+                            </a>
+                            ${app.isPWA ? `<a href="${app.pwaUrl}" target="_blank" class="flex items-center justify-center w-full py-2 bg-green-50 text-green-600 rounded hover:bg-green-100 transition text-sm font-medium"><i class="fa-solid fa-globe mr-2"></i> Abrir PWA</a>` : ''}
+                        </div>
+                    `;
+                    appsListContainer.appendChild(card);
+                });
+            }
+        }
+
+        function deleteApp(id) {
+            if(confirm('¿Estás seguro de que quieres eliminar esta ficha?')) {
+                appsDB = appsDB.filter(app => app.id !== id);
+                saveLocal();
+                filterApps();
+                showNotification('Ficha eliminada');
+            }
+        }
+
+        function saveLocal() {
+            localStorage.setItem('appsDB', JSON.stringify(appsDB));
+        }
+
+        // --- LOCAL IMPORT/EXPORT LOGIC ---
+        function exportLocalJSON() {
+            if(appsDB.length === 0) { showNotification("No hay datos para exportar", "info"); return; }
+            const dataStr = JSON.stringify(appsDB, null, 2);
+            const blob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `backup_apps_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showNotification("Backup local descargado");
+        }
+
+        function importLocalJSON(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if(Array.isArray(data)) {
+                        if(confirm(`Se importarán ${data.length} apps. Esto reemplazará los datos actuales. ¿Seguir?`)) {
+                            appsDB = data;
+                            saveLocal();
+                            filterApps();
+                            showNotification("Backup importado con éxito");
+                        }
+                    } else { alert("Formato JSON inválido"); }
+                } catch(err) { alert("Error al leer archivo"); }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // --- GITHUB MANAGER LOGIC (MEJORADA) ---
+        function toggleConfigModal() {
+            const modal = document.getElementById('config-modal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function importTokenFromFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('file-name-display').textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result.trim();
+                if (text) {
+                    document.getElementById('conf-token').value = text;
+                    showToast('Token cargado');
+                } else { alert("Archivo vacío"); }
+            };
+            reader.readAsText(file);
+        }
+
+        async function verifyGitHubToken() {
+            if (!ghConfig.token) return;
+            
+            try {
+                const res = await fetch('https://api.github.com/user', { 
+                    headers: { 
+                        'Authorization': `token ${ghConfig.token}`,
+                        'Accept': 'application/vnd.github.v3+json' 
+                    }
+                });
+                if (res.ok) {
+                    const user = await res.json();
+                    updateAuthStatus(true, user.login);
+                } else {
+                    updateAuthStatus(false, 'Token inválido');
+                }
+            } catch (e) {
+                updateAuthStatus(false, 'Error de conexión');
+            }
+        }
+
+        function saveConfig() {
+            const token = document.getElementById('conf-token').value.trim();
+            ghConfig = { token };
+            localStorage.setItem('ghConfig', JSON.stringify(ghConfig));
+            toggleConfigModal();
+            verifyGitHubToken();
+            showNotification('Configuración guardada');
+        }
+
+        async function openGithubManager() {
+            if(!ghConfig.token) {
+                toggleConfigModal();
+                showNotification("Configura tu Token primero", "error");
+                return;
+            }
+            navigateTo('screen-github');
+            await listGists();
+        }
+
+        async function listGists(showNotification = false) {
+            const listContainer = document.getElementById('gist-list-container');
+            const loader = document.getElementById('gist-loading');
+            const empty = document.getElementById('gist-empty');
+            
+            listContainer.innerHTML = '';
+            loader.classList.remove('hidden');
+            loader.classList.add('flex');
+            empty.classList.add('hidden');
+            empty.classList.remove('flex');
+
+            try {
+                const response = await fetch('https://api.github.com/gists', {
+                    headers: { 'Authorization': `token ${ghConfig.token}` }
+                });
+                
+                if(!response.ok) throw new Error("Error GitHub API");
+                const gists = await response.json();
+
+                const appBackups = gists.filter(g => g.files && g.files[GIST_FILENAME]);
+                currentGists = appBackups;
+
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+
+                if(appBackups.length === 0) {
+                    empty.classList.remove('hidden');
+                    empty.classList.add('flex');
+                    return;
+                }
+
+                renderGistList(appBackups);
+                
+                if (showNotification) {
+                    showToast(`Encontrados ${appBackups.length} backups`);
+                }
+
+            } catch(e) {
+                console.error(e);
+                loader.classList.add('hidden');
+                showNotification("Error al conectar con GitHub", "error");
+            }
+        }
+
+        function renderGistList(gists) {
+            const container = document.getElementById('gist-list-container');
+            container.innerHTML = '';
+            
+            gists.forEach((gist, index) => {
+                const date = new Date(gist.updated_at);
+                const dateFormatted = date.toLocaleDateString('es-ES', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const gistId = gist.id;
+                const desc = gist.description || '(Sin descripción)';
+                
+                const div = document.createElement('div');
+                div.id = `gist-item-${gistId}`;
+                div.className = 'gist-item bg-white p-4 rounded-lg shadow border border-gray-200';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow-1 me-3" style="cursor: pointer;" onclick="loadSpecificGist('${gistId}')">
+                            <div class="font-bold text-gray-800 text-lg mb-1">${desc}</div>
+                            <div class="text-xs text-gray-500 mt-1 flex flex-col md:flex-row md:items-center md:gap-3">
+                                <div class="flex items-center gap-1 mb-1 md:mb-0">
+                                    <i class="fa-solid fa-clock"></i> ${dateFormatted}
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-mono">ID: ${gistId.substr(0,8)}...</span>
+                                    <span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded text-xs">
+                                        ${Object.keys(gist.files).length} archivo(s)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <button onclick="loadSpecificGist('${gistId}')" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded transition flex items-center justify-center gap-1 w-full">
+                                <i class="fa-solid fa-download"></i>
+                                <span class="hidden md:inline">Restaurar</span>
+                            </button>
+                            <button onclick="updateSpecificGist('${gistId}')" 
+                                    class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-2 px-3 rounded transition flex items-center justify-center gap-1 w-full">
+                                <i class="fa-solid fa-rotate"></i>
+                                <span class="hidden md:inline">Actualizar</span>
+                            </button>
+                            <button onclick="showDeleteGistModal('${gistId}', ${index})" 
+                                    class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-3 rounded transition flex items-center justify-center gap-1 w-full delete-gist-btn">
+                                <i class="fa-solid fa-trash"></i>
+                                <span class="hidden md:inline">Eliminar</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function showDeleteGistModal(gistId, index) {
+            const gist = currentGists[index];
+            if (!gist) return;
+            
+            gistToDelete = { id: gistId, index };
+            
+            const desc = gist.description || '(Sin descripción)';
+            const date = new Date(gist.updated_at).toLocaleDateString();
+            
+            document.getElementById('delete-confirm-message').innerHTML = `
+                ¿Estás seguro de que quieres eliminar permanentemente este backup?<br><br>
+                <strong>"${desc}"</strong><br>
+                <small class="text-gray-500">Creado: ${date}</small><br><br>
+                Esta acción no se puede deshacer.
+            `;
+            
+            document.getElementById('modal-delete-confirm').classList.remove('hidden');
+            document.getElementById('modal-delete-confirm').classList.add('flex');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('modal-delete-confirm').classList.add('hidden');
+            document.getElementById('modal-delete-confirm').classList.remove('flex');
+            gistToDelete = null;
+        }
+
+        async function confirmDeleteGist() {
+            if (!gistToDelete) return;
+            
+            const { id, index } = gistToDelete;
+            const gistElement = document.getElementById(`gist-item-${id}`);
+            
+            if (!gistElement) return;
+            
+            const deleteBtn = document.getElementById('confirm-delete-btn');
+            const originalText = deleteBtn.innerHTML;
+            
+            // Deshabilitar y mostrar spinner
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Eliminando...';
+            
+            try {
+                const deleteResp = await fetch(`https://api.github.com/gists/${id}`, { 
+                    method: 'DELETE', 
+                    headers: {
+                        'Authorization': `token ${ghConfig.token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                if(!deleteResp.ok) {
+                    if (deleteResp.status === 404) {
+                        throw new Error('El backup no existe o ya fue eliminado.');
+                    } else if (deleteResp.status === 403) {
+                        throw new Error('Permiso denegado. Verifica tu token.');
+                    } else {
+                        throw new Error(`Error al eliminar: ${deleteResp.status}`);
+                    }
+                }
+                
+                // Eliminar del array y del DOM
+                currentGists.splice(index, 1);
+                gistElement.remove();
+                
+                // Verificar si quedan elementos
+                const container = document.getElementById('gist-list-container');
+                if (currentGists.length === 0) {
+                    document.getElementById('gist-empty').classList.remove('hidden');
+                    document.getElementById('gist-empty').classList.add('flex');
+                }
+                
+                showNotification('¡Backup eliminado correctamente!');
+                closeDeleteModal();
+                
+            } catch (e) {
+                console.error(e);
+                showNotification(`Error: ${e.message}`, "error");
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalText;
+            }
+        }
+
+        async function createFreshGist() {
+            if(!ghConfig.token) {
+                toggleConfigModal();
+                showNotification("Configura tu Token primero", "error");
+                return;
+            }
+            
+            if(appsDB.length === 0) {
+                showNotification("No hay datos para guardar", "error");
+                return;
+            }
+            
+            if(!confirm("¿Crear una NUEVA copia de seguridad en GitHub con los datos actuales?")) return;
+            
+            const timestamp = new Date().toLocaleString('es-ES');
+            const gistData = {
+                description: `${GIST_DESC} - ${timestamp}`,
+                public: false,
+                files: { [GIST_FILENAME]: { content: JSON.stringify(appsDB, null, 2) } }
+            };
+
+            try {
+                showNotification('Creando backup...', "info");
+                const res = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `token ${ghConfig.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(gistData)
+                });
+                
+                if(res.ok) {
+                    showNotification("Nuevo backup creado");
+                    await listGists(); // Refrescar lista
+                } else {
+                    const errorData = await res.json();
+                    throw new Error(errorData.message || "Error creando gist");
+                }
+            } catch(e) {
+                console.error(e);
+                showNotification(`Error: ${e.message}`, "error");
+            }
+        }
+
+        async function loadSpecificGist(id) {
+            if(!ghConfig.token) {
+                toggleConfigModal();
+                showNotification("Configura tu Token primero", "error");
+                return;
+            }
+            
+            if(!confirm("⚠️ CUIDADO: Esto reemplazará tus datos locales actuales con los de la copia de seguridad. ¿Continuar?")) return;
+
+            try {
+                showNotification('Cargando backup...', "info");
+                const res = await fetch(`https://api.github.com/gists/${id}`, {
+                    headers: { 'Authorization': `token ${ghConfig.token}` }
+                });
+                
+                if(!res.ok) throw new Error("Error al obtener el backup");
+                
+                const data = await res.json();
+                const content = data.files[GIST_FILENAME].content;
+                
+                const parsedData = JSON.parse(content);
+                
+                if(!Array.isArray(parsedData)) {
+                    throw new Error("Formato de datos inválido");
+                }
+                
+                appsDB = parsedData;
+                saveLocal();
+                showNotification("Datos recuperados exitosamente");
+                navigateTo('screen-menu');
+                
+            } catch(e) {
+                console.error(e);
+                showNotification(`Error: ${e.message}`, "error");
+            }
+        }
+
+        async function updateSpecificGist(id) {
+            if(!ghConfig.token) {
+                toggleConfigModal();
+                showNotification("Configura tu Token primero", "error");
+                return;
+            }
+            
+            if(appsDB.length === 0) {
+                showNotification("No hay datos para actualizar", "error");
+                return;
+            }
+
+            if(!confirm("¿Seguro que quieres actualizar ESTA copia específica con tus datos actuales?")) return;
+
+            const timestamp = new Date().toLocaleString('es-ES');
+            const gistData = {
+                description: `${GIST_DESC} - ${timestamp}`,
+                files: { [GIST_FILENAME]: { content: JSON.stringify(appsDB, null, 2) } }
+            };
+
+            try {
+                showNotification('Actualizando backup...', "info");
+                const res = await fetch(`https://api.github.com/gists/${id}`, {
+                    method: 'PATCH',
+                    headers: { 
+                        'Authorization': `token ${ghConfig.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(gistData)
+                });
+                
+                if(res.ok) {
+                    showNotification("Copia actualizada");
+                    await listGists(); 
+                } else {
+                    const errorData = await res.json();
+                    throw new Error(errorData.message || "Error actualizando gist");
+                }
+            } catch(e) {
+                console.error(e);
+                showNotification(`Error: ${e.message}`, "error");
+            }
+        }
+    </script>
+</body>
+</html>
