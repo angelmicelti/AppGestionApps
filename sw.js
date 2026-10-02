@@ -36,9 +36,11 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     // Limpiar todas las cachés antiguas
     caches.keys().then(cacheNames => {
+      // Solo se eliminan las cachés propias de esta app (mismo prefijo),
+      // nunca las de otras aplicaciones del mismo origen.
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName !== CACHE_NAME && cacheName.startsWith('gestion-apps-')) {
             console.log('[SW] Borrando caché antigua:', cacheName);
             return caches.delete(cacheName);
           }
